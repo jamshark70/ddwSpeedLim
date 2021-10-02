@@ -6,8 +6,8 @@ SpeedLim {
 	var state = \idle;
 	var lastOutTime = 0, lastInTime = 0;
 
-	*new { |time = 0, action, initVal, clock(SystemClock)|
-		^super.newCopyArgs(time, action, initVal, clock)
+	*new { |time = 0, action, clock(SystemClock)|
+		^super.newCopyArgs(time, action, nil, clock)
 	}
 
 	value { |... invals|

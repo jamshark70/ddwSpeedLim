@@ -26,10 +26,7 @@ ARGUMENT:: time
 Minimum number of seconds between firing the action.
 
 ARGUMENT:: action
-A function that will be called with updates. It should take a single argument for the new value.
-
-ARGUMENT:: initVal
-Optional. You may initialize the SpeedLim's value.
+A function that will be called with updates. It takes any number of arguments, corresponding to values passed from the upstream caller. See the "argument passing" example below.
 
 ARGUMENT:: clock
 Optional. You may specify a clock for scheduling future updates. The default is link::Classes/SystemClock::, although link::Classes/AppClock:: may be used if you expect to run GUI updates in response to incoming messages.
@@ -97,7 +94,7 @@ w.layout = VLayout(
 sl.action = SpeedLim(0.15, { |view|
     j = view.value;
     uv.refresh;
-}, clock: AppClock);
+}, AppClock);
 
 uv.drawFunc = { |view|
 	var b = view.bounds.moveTo(0, 0);
