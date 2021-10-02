@@ -14,7 +14,9 @@ SpeedLim {
 		value = invals;
 		lastInTime = clock.seconds;
 		if(state == \idle) {
-			if(this.ready) { this.doAction };
+			// sched(0) here may make a difference for
+			// GUI updates on AppClock
+			if(this.ready) { clock.sched(0, { this.doAction }) };
 			state = \pending;
 			clock.sched(time, {
 				if(this.ready) { this.doAction };

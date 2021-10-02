@@ -145,9 +145,9 @@ resp = OSCFunc(
 	func: SpeedLim(0.15, { |msg, time, addr|
 		[msg, time, addr].postln;
 		j = msg[3];
-		// SpeedLim does not save you from 'defer'
-		defer { uv.refresh }
-	}),
+		// SpeedLim on AppClock saves you from 'defer'!
+		uv.refresh;
+	}, AppClock),
 	path: '/mouseY',
 	srcID: s.addr
 );
