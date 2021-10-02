@@ -1,0 +1,170 @@
+TITLE:: SpeedLim
+summary:: Guarantees minimum time between updates
+categories:: Scheduling
+related:: Classes/SkipJack
+
+DESCRIPTION::
+SpeedLim does the same thing as [speedlim] in Max: Given an incoming stream of data, it passes through updates only after a period of time. Use this for GUI, MIDI or OSC control streams where too many messages are being sent per second and you want to slow down SC's response.
+
+More specifically:
+
+list::
+## If it hasn't received an update in a while, it will pass through the first value immediately.
+## Subsequent values received within code::time:: seconds will be dropped.
+## Only the last of these will be passed through after code::time:: seconds.
+::
+
+Unlike link::Classes/SkipJack::, there is no guarantee of exact periodicity. But, SpeedLim will react immediately if it's idle (where SkipJack simply quantizes time). Also, SkipJack will fire its action even if there is no update; SpeedLim avoids redundant actions.
+
+
+CLASSMETHODS::
+
+METHOD:: new
+Create a new instance.
+
+ARGUMENT:: time
+Minimum number of seconds between firing the action.
+
+ARGUMENT:: action
+A function that will be called with updates. It should take a single argument for the new value.
+
+ARGUMENT:: initVal
+Optional. You may initialize the SpeedLim's value.
+
+ARGUMENT:: clock
+Optional. You may specify a clock for scheduling future updates. The default is link::Classes/SystemClock::, although link::Classes/AppClock:: may be used if you expect to run GUI updates in response to incoming messages.
+
+returns:: The SpeedLim instance.
+
+
+INSTANCEMETHODS::
+
+METHOD:: value
+Update the SpeedLim value, and fire the action when needed. This is analogous to an incoming message in the Max [speedlim] object. If not enough time has passed, the action will be delayed.
+
+Because this is code::value:: and not code::value_::, a SpeedLim can be used in place of an action function in GUI objects, MIDIFuncs and OSCFuncs. 
+
+ARGUMENT:: ... invals
+Any value(s) serving as the update. There is no restriction on datatype. They will be passed as-is to the action function, as multiple arguments if several values were passed in initially.
+
+returns:: Self.
+
+METHOD:: time
+Get or set the time period.
+
+METHOD:: action
+Get or set the action function.
+
+METHOD:: clock
+Get or set the clock.
+
+PRIVATE:: ready, doAction
+
+
+
+EXAMPLES::
+
+code::
+l = SpeedLim(0.25, { |value| [SystemClock.seconds, value].postln });
+
+l.value(1);  // immediate result
+
+// "too fast" update:
+// result times should be 0.25 seconds apart
+fork { l.value(0); 0.15.wait; l.value(1) };
+
+// "too slow" update:
+// timing is unaffected
+fork { l.value(0); 0.35.wait; l.value(1) };
+
+
+// limit rate of slider response
+// try changing the SpeedLim time
+// to see the difference in responsiveness
+
+(
+var sl, uv, j = 0, speedlim;
+
+w = Window("SpeedLim",
+	Rect.aboutPoint(Window.screenBounds.center, 200, 200)
+).front;
+
+w.layout = VLayout(
+	sl = Slider().orientation_(\horizontal).maxHeight_(30),
+	uv = UserView().background_(Color(0.1, 0.1, 0.4))
+);
+
+sl.action = SpeedLim(0.15, { |view|
+    j = view.value;
+    uv.refresh;
+}, clock: AppClock);
+
+uv.drawFunc = { |view|
+	var b = view.bounds.moveTo(0, 0);
+	Pen.color_(Color.white)
+	.fillOval(
+		Rect.aboutPoint(
+			b.center,
+			b.width * j * 0.5,
+			b.height * j * 0.5
+		)
+	);
+};
+)
+
+
+// argument passing: multiple values from OSCFunc
+
+(
+var uv, synth, resp, j = 0, speedlim;
+
+w = Window("SpeedLim",
+	Rect.aboutPoint(Window.screenBounds.center, 200, 200)
+).front;
+
+w.layout = VLayout(
+	uv = UserView().background_(Color(0.1, 0.1, 0.4))
+);
+
+w.onClose = { synth.free; resp.free };
+
+// high-rate transmission of mouse data (50x per second)
+s.waitForBoot {
+	synth = {
+		var trig = Impulse.kr(50);
+		var mouse = Latch.kr(MouseY.kr(0, 1, 0, 0), trig);
+		SendReply.kr(Changed.kr(mouse), '/mouseY', mouse);
+		Silent.ar(1)
+	}.play;
+};
+
+// Receive them all, but consume them more slowly.
+// SpeedLim is 'value'd 50x per second
+// but fires its own action no sooner than 0.15 seconds.
+// Note that the arguments passed into SpeedLim's function
+// are the same as those passed to the OSCFunc function
+// (so all data given to OSCFunc are available downstream).
+resp = OSCFunc(
+	func: SpeedLim(0.15, { |msg, time, addr|
+		[msg, time, addr].postln;
+		j = msg[3];
+		// SpeedLim does not save you from 'defer'
+		defer { uv.refresh }
+	}),
+	path: '/mouseY',
+	srcID: s.addr
+);
+
+uv.drawFunc = { |view|
+	var b = view.bounds.moveTo(0, 0);
+	Pen.color_(Color.white)
+	.fillOval(
+		Rect.aboutPoint(
+			b.center,
+			b.width * j * 0.5,
+			b.height * j * 0.5
+		)
+	);
+};
+)
+::
